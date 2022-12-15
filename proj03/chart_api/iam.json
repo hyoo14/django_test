@@ -1,0 +1,70 @@
+{
+  "bindings": [
+    {
+      "members": [
+        "serviceAccount:service-43387410422@gcp-sa-aiplatform.iam.gserviceaccount.com"
+      ],
+      "role": "roles/aiplatform.serviceAgent"
+    },
+    {
+      "members": [
+        "user:hyunwoo.yoo@hyperlounge.ai"
+      ],
+      "role": "roles/billing.projectManager"
+    },
+    {
+      "members": [
+        "serviceAccount:43387410422@cloudbuild.gserviceaccount.com"
+      ],
+      "role": "roles/cloudbuild.builds.builder"
+    },
+    {
+      "members": [
+        "serviceAccount:service-43387410422@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+      ],
+      "role": "roles/cloudbuild.serviceAgent"
+    },
+    {
+      "members": [
+        "serviceAccount:service-43387410422@gcf-admin-robot.iam.gserviceaccount.com"
+      ],
+      "role": "roles/cloudfunctions.serviceAgent"
+    },
+    {
+      "members": [
+        "serviceAccount:service-43387410422@compute-system.iam.gserviceaccount.com"
+      ],
+      "role": "roles/compute.serviceAgent"
+    },
+    {
+      "members": [
+        "serviceAccount:service-43387410422@containerregistry.iam.gserviceaccount.com"
+      ],
+      "role": "roles/containerregistry.ServiceAgent"
+    },
+    {
+      "members": [
+        "serviceAccount:43387410422-compute@developer.gserviceaccount.com",
+        "serviceAccount:43387410422@cloudservices.gserviceaccount.com",
+        "serviceAccount:gcloud-hlhl@appspot.gserviceaccount.com",
+        "user:hyunwoo.yoo@hyperlounge.ai"
+      ],
+      "role": "roles/editor"
+    },
+    {
+      "members": [
+        "serviceAccount:my-service-account@gcloud-hlhl.iam.gserviceaccount.com",
+        "user:yoohw.hl@gmail.com"
+      ],
+      "role": "roles/owner"
+    },
+    {
+      "members": [
+        "serviceAccount:service-43387410422@gcp-sa-pubsub.iam.gserviceaccount.com"
+      ],
+      "role": "roles/pubsub.serviceAgent"
+    }
+  ],
+  "etag": "BwXuLVFOawY=",
+  "version": 1
+}

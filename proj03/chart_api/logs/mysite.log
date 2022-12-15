@@ -1,0 +1,6 @@
+2022-12-14 18:50:57,545 [INFO] django.utils.autoreload: Watching for file changes with StatReloader
+2022-12-14 18:52:21,117 [INFO] django.utils.autoreload: /Users/hl/Projects/proj03/chart_api/charts/views.py changed, reloading.
+2022-12-14 18:52:21,782 [INFO] django.utils.autoreload: Watching for file changes with StatReloader
+2022-12-14 18:53:07,478 [INFO] django.utils.autoreload: /Users/hl/Projects/proj03/chart_api/charts/views.py changed, reloading.
+2022-12-14 18:53:08,137 [INFO] django.utils.autoreload: Watching for file changes with StatReloader
+2022-12-14 18:53:30,802 [INFO] my: validation logic works
