@@ -4,3 +4,7 @@
 2022-12-14 18:53:07,478 [INFO] django.utils.autoreload: /Users/hl/Projects/proj03/chart_api/charts/views.py changed, reloading.
 2022-12-14 18:53:08,137 [INFO] django.utils.autoreload: Watching for file changes with StatReloader
 2022-12-14 18:53:30,802 [INFO] my: validation logic works
+2022-12-16 07:55:26,509 [INFO] django.utils.autoreload: Watching for file changes with StatReloader
+2022-12-16 07:55:45,570 [INFO] my: validation logic works
+2022-12-16 07:55:45,594 [WARNING] django.request: Bad Request: /charts/
+2022-12-16 07:57:45,897 [INFO] django.utils.autoreload: /Users/hl/Projects/gittest/django_test/proj03/chart_api/chart_api/settings.py changed, reloading.

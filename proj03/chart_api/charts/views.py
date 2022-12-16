@@ -5,83 +5,125 @@ from django.shortcuts import render, redirect
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 
-from charts.forms import RegisterForm
+#from charts.forms import RegisterForm
 from .serializers import ChartSerializer
 from .models import Chart
 from google.cloud import bigquery
 
 #에러로그 추가
 import logging
-logger = logging.getLogger('my')
 
-class ChartViewSet(viewsets.ModelViewSet):#기본 crud로직 그룹화한 viewset 사용
-    queryset = Chart.objects.all() #그대로 쓰면 안 되는 상황(검증 추가)에 동작시키는 방안
+logger = logging.getLogger("myLogger")  # 에러 로거
+
+class ChartViewSet(viewsets.ModelViewSet):
+    """
+    Django에서 제공해주는 기본 crud로직 그룹화한 viewset으로 Chart용 CRUD 제공한다.
+
+    create, update 메서드를 오버라이드해서 검증로직을 추가해주었다.
+    """
+    queryset = Chart.objects.all()
     serializer_class = ChartSerializer
-    #차트 타입에 따라서 필수인 필드와 아닌 필드 임의로 지정
+
     def validation_logic(self, serializer):
+        """
+        검증로직으로 오류인 경우를 찾아준다.
 
-        # data = request.data
-        # serializer = ChartSerializer(data=data)
+        chart_cd, chart_tpcd 네이밍, 차트 타입에 따라서 필수인 필드와 아닌 필드가 잘 쓰였는지 검사된다.
 
-        # chart_cd, chart_tpcd = request.POST.get('CHART_CD'), request.POST.get('CHART_TPCD')
-        chart_cd, chart_tpcd = serializer.initial_data['CHART_CD'], serializer.initial_data['CHART_TPCD']
-        # char_COL_ITEM_TXT_EMPH_TLTIP_VL = request.POST.get('COL_ITEM_TXT_EMPH_TLTIP_VL')
-        chart_COL_ITEM_TXT_EMPH_TLTIP_VL = serializer.initial_data['COL_ITEM_TXT_EMPH_TLTIP_VL']
+        Args:
+            serializer: chart가 가진 모든 value들을 담은 serializer
 
-        # chart_cd와 chart_tpcd는 모두 있어야
-        # if chart_cd is not None and chart_tpcd is not None:
-        # 이 케이스 제외 제낌
-        print("work")
-        logger.info("validation logic works")  # 특정 로그를 파일로 출력
-        if not serializer.is_valid():
-            return "error"  # HttpResponseRedirect('admin/')
+        Returns:
+            에러인 경우 "error" 반환하고 에러가 검출되지 않은 경우 "no error" 반환
 
-        if chart_cd is None or chart_tpcd is None:
-            return "error"  # HttpResponseRedirect('admin/')
+        """
 
-        if str(chart_tpcd) + "_" not in str(chart_cd):
-            return "error"  # HttpResponseRedirect('admin/')
+        if not serializer.is_valid():  # table 스키마 검증
+            logger.error( ("테이블 스키마 오류") )
+            return False
+        chart_cd = serializer.initial_data.get('CHART_CD')
+        chart_tpcd = serializer.initial_data.get('CHART_TPCD')
+        chart_COL_ITEM_TXT_EMPH_TLTIP_VL = serializer.initial_data.get('COL_ITEM_TXT_EMPH_TLTIP_VL')
 
-        if str(chart_tpcd) == "LINE" and len(chart_COL_ITEM_TXT_EMPH_TLTIP_VL) == 0:
-            return "error"  # HttpResponseRedirect('admin/')
+        logger.error("validation logic works")  # 검증 로직 작동 로그를 파일로 출력
+        # logger.info(chart_cd, '  ', chart_tpcd, '   ', len(chart_COL_ITEM_TXT_EMPH_TLTIP_VL))
 
-        print(chart_cd, '  ', chart_tpcd, '   ', len(chart_COL_ITEM_TXT_EMPH_TLTIP_VL))
-        return "no error"
+
+        if chart_cd is None or chart_tpcd is None:  # chart_cd, chart_tpcd 입력 검증
+            logger.error("chart_cd, chart_tpcd 입력 오류")
+            return False
+
+        if str(chart_tpcd) + "_" not in str(chart_cd):  # chart_cd, chart_tpcd 네이밍 검증
+            logger.error("chart_cd 명명 오류")
+            return False
+
+        if str(chart_tpcd) == "LINE" and len(chart_COL_ITEM_TXT_EMPH_TLTIP_VL) == 0:  # chart_tpcd에 따른 필수필드 검증
+            logger.error("필수 필드 미입력 오류")
+            return False
+
+        return True
 
     def create(self, request):
+        """
+        chart info를 추가한다.
+
+        Argus:
+            request: 리퀘스트(에 포함된 데이터)
+
+        Return:
+            Response: 응답 반환(http status code 포함)
+
+        """
         data = request.data
         serializer = ChartSerializer(data=data)
-        isValid = self.validation_logic(serializer)
-        print(isValid)
-        if isValid == "error":
+        is_valid = self.validation_logic(serializer) # 검증 로직
+        # try/catch exception handling 형태로
+        if is_valid is False:  # 검증 오류시 400반환
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-        # if serializer.is_valid():
-        #     print("=========================",serializer.initial_data['COL_ITEM_TXT_EMPH_TLTIP_VL'])
-        #     if serializer.initial_data['COL_ITEM_TXT_EMPH_TLTIP_VL'] == 'blue_black':
-        #         serializer.save()  # save to DB
-        #         return Response(serializer.data)
-        # return Response(serializer.errors)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)  # 검증 오류 발견되지 않을 경우 201 반환
 
+    def update(self, request, *args, **kwargs): #pk=None):
+        """
+        chart info를 수정한다.
 
-    #PUT: The PUT method replaces all current representations of the target resource with the request payload.
-    def update(self, request, pk=None):
+        The PUT method replaces all current representations of the target resource with the request payload.
+
+        Argus:
+            request: 리퀘스트(에 포함된 데이터)
+
+        Return:
+            Response: 응답 반환(http status code 포함)
+
+        """
         data = request.data
         serializer = ChartSerializer(data=data)
-        isValid = self.validation_logic(serializer)
-        print(isValid)
-        if isValid == "error":
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        super().update(request)
-        return Response(serializer.data, status=status.HTTP_202_ACCEPTED) #
+        is_valid = self.validation_logic(serializer)
 
-    #PATCH: The PATCH method is used to apply partial modifications to a resource.
+        if is_valid is False:   # 검증 오류시 400 http status code 반환
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        super().update(request, *args, **kwargs) #super().update(request)     # 오류 없을 경우 update 및 202 http status code 반환
+
+        return Response(serializer.data, status=status.HTTP_200_OK)   # 202 코드 조사, 200번대 수정 때
+
+
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
+
+####### 패치(파셜 업데이트) 에러로그 500만 남. 왜 나는지, 어떻게 처리해야하는지도 알아볼 것
     # def partial_update(self, request, pk=None):
+          # PATCH: The PATCH method is used to apply partial modifications to a resource.
     #     pass
 
     # def destroy(self, request, pk=None):
     #     pass
+
+
+
 
 
 import pandas as pd
