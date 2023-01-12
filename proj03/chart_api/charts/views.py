@@ -1,16 +1,22 @@
+# views.py
+"""
+필요한 데이터를 모델(혹은 연동될 bigquery, sharepoint와 같은 외부)에서 가져와서 가공, 웹 페이지 결과를 만들도록하는 컨트롤러
+
+차트 모델 CRUD용 쿼리셋 클래스 포함
+빅쿼리 관련 함수들은 추후 고도화 예정
+sharepoint 연동 추가 예정
+
+사용 가능 함수:
+-
+"""
 import pandas as pd
 from django.shortcuts import render, redirect
-
-# Create your views here.
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-
-#from charts.forms import RegisterForm
+from charts.forms import RegisterForm
 from .serializers import ChartSerializer
 from .models import Chart
 from google.cloud import bigquery
-
-#에러로그 추가
 import logging
 
 logger = logging.getLogger("myLogger")  # 에러 로거
@@ -123,19 +129,183 @@ class ChartViewSet(viewsets.ModelViewSet):
     #     pass
 
 
+######################################## related to biquery test ########################################
 
+# 서비스 계정 키 설정 맟 디비커넥션
+import glob
+from google.oauth2 import service_account
+from google.cloud import bigquery
+import psycopg2
+
+# 서비스 계정 키 JSON 파일 경로
+key_path = glob.glob("hlhl2-374201-1ba184d467da.json")[0]
+
+# Credentials 객체 생성
+credentials = service_account.Credentials.from_service_account_file(key_path)
+
+# table 세팅
+dataset_id = "hlhl2-374201.test_dataset_00"
+dataset = bigquery.Dataset(dataset_id)
+table_id = dataset_id + ".test_table_00"
+
+schema = [
+        bigquery.SchemaField("id", "STRING"),
+        bigquery.SchemaField("COL_ITEM_TXT_EMPH_TLTIP_VL", "STRING"),
+        bigquery.SchemaField("COL_AXISX_TTL_GNRL_VL", "STRING"),
+        bigquery.SchemaField("COL_AXISX_TTL_EMPH_VL", "STRING"),
+        bigquery.SchemaField("ITEM_SET_USYN", "STRING"),
+        bigquery.SchemaField("ITEM_SET_MIN_VL", "FLOAT"),
+        bigquery.SchemaField("ITEM_SET_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("AXISY_USYN", "STRING"),
+        bigquery.SchemaField("AXISY_CNT_MIN_VL", "FLOAT"),
+        bigquery.SchemaField("AXISY_CNT_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("AXISY_TTL_NMB_MIN_VL", "FLOAT"),
+        bigquery.SchemaField("AXISY_TTL_NMB_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("AXISY_TTL_LET_CNT_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("COL_AXISY_TTL_VL", "STRING"),
+        bigquery.SchemaField("COL_AXISY_LINE_VL", "STRING"),
+        bigquery.SchemaField("LEGD_USYN", "STRING"),
+        bigquery.SchemaField("LEGD_NMB_MIN_VL", "FLOAT"),
+        bigquery.SchemaField("LEGD_NMB_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("LEGD_TXT_LET_CNT_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("COL_ITEM_EMPH_LEGD1_VL", "STRING"),
+        bigquery.SchemaField("COL_ITEM_EMPH_LEGD2_VL", "STRING"),
+        bigquery.SchemaField("COL_ITEM_EMPH_LEGD3_VL", "STRING"),
+        bigquery.SchemaField("COL_ITEM_EMPH_LEGD4_VL", "STRING"),
+        bigquery.SchemaField("COL_ITEM_EMPH_LEGD5_VL", "STRING"),
+        bigquery.SchemaField("THRHLD_USYN", "STRING"),
+        bigquery.SchemaField("THRHLD_RFLN_NMB_MIN_VL", "FLOAT"),
+        bigquery.SchemaField("THRHLD_RFLN_NMB_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("THRHLD_TXT_LET_CNT_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("COL_THRHLD_RFLN_VL", "STRING"),
+        bigquery.SchemaField("COL_THRHLD_TXT_VL", "STRING"),
+        bigquery.SchemaField("ASST_TXT_USYN", "STRING"),
+        bigquery.SchemaField("ASST_TXT_NMB_MIN_VL", "FLOAT"),
+        bigquery.SchemaField("ASST_TXT_NMB_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("ASST_TXT_LET_CNT", "FLOAT"),
+        bigquery.SchemaField("COL_ASST_TXT_VL", "STRING"),
+        bigquery.SchemaField("MSG_USYN", "STRING"),
+        bigquery.SchemaField("MSG_ROW_CNT_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("MSG_ROW_CNT_MIN_VL", "FLOAT"),
+        bigquery.SchemaField("MSG_ROW_LET_CNT_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("MSG_EMPH_CNT", "FLOAT"),
+        bigquery.SchemaField("MSG_CNT", "FLOAT"),
+        bigquery.SchemaField("MSG_IMPN_INDX_CNT", "FLOAT"),
+        bigquery.SchemaField("MSG_ASST_INDX_CNT", "FLOAT"),
+        bigquery.SchemaField("MSG_IMPN_INDX_LET_CNT_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("MSG_ASST_INDX_TTL_LET_CNT_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("MSG_ASST_INDX_LET_CNT_MAX_VL", "FLOAT"),
+        bigquery.SchemaField("MSG_STUS_ICON_CNT", "FLOAT"),
+        bigquery.SchemaField("MSG_BTN_CNT", "FLOAT"),
+        bigquery.SchemaField("COL_MSG_GNRL_VL", "STRING"),
+        bigquery.SchemaField("COL_MSG_EMPH_VL", "STRING"),
+        bigquery.SchemaField("COL_IMPN_INDX_VL", "STRING"),
+        bigquery.SchemaField("COL_ASST_INDX_TTL_VL", "STRING"),
+        bigquery.SchemaField("COL_ASST_INDX_VL", "STRING"),
+        bigquery.SchemaField("ITEM_PART_ALL_USYN", "STRING"),
+        bigquery.SchemaField("ITEM_TXT_NMB_PART_VL", "FLOAT"),
+        bigquery.SchemaField("ITEM_TXT_NMB_ALL_VL", "FLOAT"),
+        bigquery.SchemaField("COL_ITEM_GNRL_PART_VL", "STRING"),
+        bigquery.SchemaField("COL_ITEM_GNRL_ALL_VL", "STRING"),
+        bigquery.SchemaField("COL_ITEM_EMPH_PART_VL", "STRING"),
+        bigquery.SchemaField("COL_ITEM_EMPH_ALL_VL", "STRING"),
+        bigquery.SchemaField("COL_ITEM_TXT_EMPH_PART_VL", "STRING"),
+        bigquery.SchemaField("COL_ITEM_TXT_EMPH_ALL_VL", "STRING"),
+        bigquery.SchemaField("TBL_YN", "STRING"),
+        bigquery.SchemaField("COL_TBL_TXT_VL", "STRING"),
+        bigquery.SchemaField("COL_TBL_DSNC_LINE_VL", "STRING"),
+        bigquery.SchemaField("COL_TBL_TTL_VL", "STRING"),
+        bigquery.SchemaField("COL_TBL_TTL_BGD_VL", "STRING"),
+        bigquery.SchemaField("USYN", "STRING"),
+        bigquery.SchemaField("RGPR_ID", "STRING"),
+        bigquery.SchemaField("RGDA", "STRING"),
+        bigquery.SchemaField("MDPR_ID", "STRING"),
+        bigquery.SchemaField("LAST_MDFC_DTTM", "STRING"),
+        bigquery.SchemaField("CHART_CD", "STRING"),
+        bigquery.SchemaField("CHART_TPCD", "STRING"),
+    ]
+
+
+def to_bq(request):
+    # GCP 클라이언트 객체 생성
+    client = bigquery.Client(credentials=credentials,
+                             project=credentials.project_id)
+
+    connection = psycopg2.connect(host="127.0.0.1", dbname="chart", user="hl", password="hl", port=5432)
+    cur = connection.cursor()
+    cur.execute("SELECT * FROM charts_chart;")
+    datum = cur.fetchall()
+
+    rows_to_insert = []
+    for data in datum:
+        # print(len(data),'  ',data)
+        form = {}
+        i = 0
+        for value in data:
+            # print(value, i)
+            if value is not None:
+                form[schema[i].name] = value
+            i += 1
+        rows_to_insert.append(form)
+
+    # API 리퀘스트
+    errors = client.insert_rows_json(table_id, rows_to_insert)
+    if errors == []:
+        print("New rows have been added.")
+    else:
+        print("Encountered errors while inserting rows: {}".format(errors))
+
+    return redirect('../admin/')
+
+
+def delete_table_bq(request):
+    # GCP 클라이언트 객체 생성
+    client = bigquery.Client(credentials=credentials,
+                             project=credentials.project_id)
+    # API 리퀘스트
+    client.delete_table(table_id, not_found_ok=True)
+    print("Deleted table '{}'.".format(table_id))
+
+    return redirect('../admin/')
+
+
+def create_table_bq(request):
+    client = bigquery.Client(credentials=credentials,
+                             project=credentials.project_id)
+
+    # table_id = bigquery.Table.from_string("gcloud-hlhl.data_set.chart_info")
+    # schema = [
+    #     bigquery.SchemaField("id", "STRING"),
+    # ]
+    # 테이블 아이디, 스키마 전역변수로 설정해놓음.. 테스트 이후 파라미터로 바꿀 것++
+
+    table = bigquery.Table(table_id, schema=schema)
+    table = client.create_table(table)
+    print(
+            "Created table {}.{}.{}".format(table.project, table.dataset_id, table.table_id)
+    )
+    
+    return redirect('../admin/')
+
+
+
+
+
+
+
+
+######################################## 다른 곳에 구현 또는 테스트의 테스트용 ########################################
 
 
 import pandas as pd
+
+
 def export_value():
     authors = pd.read_excel("맘스터치권한세팅.xlsx")
     print(authors)
 
 
-
-
-
-def export_to_bq(request): #chart_info 과거에 만든 것도(필드 추가나 제거된 것도) ->스키마를 보고 자동생성하기
+def export_to_bq(request):  # chart_info 과거에 만든 것도(필드 추가나 제거된 것도) ->스키마를 보고 자동생성하기
     GOOGLE_APPLICATION_CREDENTIALS = "iam.json"
 
     client = bigquery.Client()
@@ -152,89 +322,4 @@ def export_to_bq(request): #chart_info 과거에 만든 것도(필드 추가나 
     rows = query_job.result()
     for row in rows:
         print(row.name)
-    return redirect('../admin/')
-
-
-
-def create_table_bq(request):
-
-    client = bigquery.Client()
-    table_id = bigquery.Table.from_string("gcloud-hlhl.data_set.chart_info")
-    schema = [
-            bigquery.SchemaField("COL_ITEM_TXT_EMPH_TLTIP_VL", "STRING"),
-            bigquery.SchemaField("COL_AXISX_TTL_GNRL_VL", "STRING"),
-            bigquery.SchemaField("COL_AXISX_TTL_EMPH_VL", "STRING"),
-            bigquery.SchemaField("ITEM_SET_USYN", "STRING"),
-            bigquery.SchemaField("ITEM_SET_MIN_VL","FLOAT"),
-            bigquery.SchemaField("ITEM_SET_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("AXISY_USYN", "STRING"),
-            bigquery.SchemaField("AXISY_CNT_MIN_VL", "FLOAT"),
-            bigquery.SchemaField("AXISY_CNT_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("AXISY_TTL_NMB_MIN_VL", "FLOAT"),
-            bigquery.SchemaField("AXISY_TTL_NMB_MAX_VL",  "FLOAT"),
-            bigquery.SchemaField("AXISY_TTL_LET_CNT_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("COL_AXISY_TTL_VL", "STRING"),
-            bigquery.SchemaField("COL_AXISY_LINE_VL", "STRING"),
-            bigquery.SchemaField("LEGD_USYN", "STRING"),
-            bigquery.SchemaField("LEGD_NMB_MIN_VL", "FLOAT"),
-            bigquery.SchemaField("LEGD_NMB_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("LEGD_TXT_LET_CNT_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("COL_ITEM_EMPH_LEGD1_VL", "STRING"),
-            bigquery.SchemaField("COL_ITEM_EMPH_LEGD2_VL", "STRING"),
-            bigquery.SchemaField("COL_ITEM_EMPH_LEGD3_VL", "STRING"),
-            bigquery.SchemaField("COL_ITEM_EMPH_LEGD4_VL", "STRING"),
-            bigquery.SchemaField("COL_ITEM_EMPH_LEGD5_VL", "STRING"),
-            bigquery.SchemaField("THRHLD_USYN", "STRING"),
-            bigquery.SchemaField("THRHLD_RFLN_NMB_MIN_VL", "FLOAT"),
-            bigquery.SchemaField("THRHLD_RFLN_NMB_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("THRHLD_TXT_LET_CNT_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("COL_THRHLD_RFLN_VL", "STRING"),
-            bigquery.SchemaField("ASST_TXT_USYN", "STRING"),
-            bigquery.SchemaField("ASST_TXT_NMB_MIN_VL", "FLOAT"),
-            bigquery.SchemaField("ASST_TXT_NMB_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("ASST_TXT_LET_CNT", "FLOAT"),
-            bigquery.SchemaField("COL_ASST_TXT_VL", "STRING"),
-            bigquery.SchemaField("MSG_USYN", "STRING"),
-            bigquery.SchemaField("MSG_ROW_CNT_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("MSG_ROW_CNT_MIN_VL", "FLOAT"),
-            bigquery.SchemaField("MSG_ROW_LET_CNT_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("MSG_EMPH_CNT", "FLOAT"),
-            bigquery.SchemaField("MSG_CNT", "FLOAT"),
-            bigquery.SchemaField("MSG_IMPN_INDX_CNT", "FLOAT"),
-            bigquery.SchemaField("MSG_ASST_INDX_CNT", "FLOAT"),
-            bigquery.SchemaField("MSG_IMPN_INDX_LET_CNT_MAX_VL",        "FLOAT"),
-            bigquery.SchemaField("MSG_ASST_INDX_TTL_LET_CNT_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("MSG_ASST_INDX_LET_CNT_MAX_VL", "FLOAT"),
-            bigquery.SchemaField("MSG_STUS_ICON_CNT", "FLOAT"),
-            bigquery.SchemaField("MSG_BTN_CNT", "FLOAT"),
-            bigquery.SchemaField("COL_MSG_GNRL_VL",          "STRING"),
-            bigquery.SchemaField("COL_MSG_EMPH_VL", "STRING"),
-            bigquery.SchemaField("COL_IMPN_INDX_VL", "STRING"),
-            bigquery.SchemaField("COL_ASST_INDX_TTL_VL", "STRING"),
-            bigquery.SchemaField("COL_ASST_INDX_VL", "STRING"),
-            bigquery.SchemaField("ITEM_PART_ALL_USYN",          "STRING"),
-            bigquery.SchemaField("ITEM_TXT_NMB_PART_VL", "FLOAT"),
-            bigquery.SchemaField("ITEM_TXT_NMB_ALL_VL", "FLOAT"),
-            bigquery.SchemaField("COL_ITEM_GNRL_PART_VL", "STRING"),
-            bigquery.SchemaField("COL_ITEM_GNRL_ALL_VL", "STRING"),
-            bigquery.SchemaField("COL_ITEM_EMPH_PART_VL",             "STRING"),
-            bigquery.SchemaField("COL_ITEM_EMPH_ALL_VL", "STRING"),
-            bigquery.SchemaField("COL_ITEM_TXT_EMPH_PART_VL", "STRING"),
-            bigquery.SchemaField("COL_ITEM_TXT_EMPH_ALL_VL", "STRING"),
-            bigquery.SchemaField("TBL_YN", "STRING"),
-            bigquery.SchemaField("COL_TBL_TXT_VL",            "STRING"),
-            bigquery.SchemaField("COL_TBL_DSNC_LINE_VL", "STRING"),
-            bigquery.SchemaField("COL_TBL_TTL_VL", "STRING"),
-            bigquery.SchemaField("COL_TBL_TTL_BGD_VL", "STRING"),
-            bigquery.SchemaField("USYN", "STRING"),
-            bigquery.SchemaField("RGPR_ID", "STRING"),
-            bigquery.SchemaField("RGDA", "STRING"),
-            bigquery.SchemaField("MDPR_ID", "STRING"),
-            bigquery.SchemaField("LAST_MDFC_DTTM",            "STRING"),
-        ]
-    table = bigquery.Table(table_id, schema=schema)
-    table = client.create_table(table)
-    print(
-            "Created table {}.{}.{}".format(table.project, table.dataset_id, table.table_id)
-    )
     return redirect('../admin/')
