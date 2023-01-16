@@ -226,6 +226,57 @@ schema = [
     ]
 
 
+def to_bq2(request):
+    # GCP 클라이언트 객체 생성
+    client = bigquery.Client(credentials=credentials,
+                             project=credentials.project_id)
+
+    # local PG 데이터 다 긁어옴
+    connection = psycopg2.connect(host="127.0.0.1", dbname="chart", user="hl", password="hl", port=5432)
+    cur = connection.cursor()
+    cur.execute("SELECT * FROM charts_chart;")
+    datum_pg = cur.fetchall()
+
+    # BigQuery 데이터 다 긁어옴( 전부 insert하는 것의 1/100 가격)
+    QUERY = ("SELECT * FROM " + table_id)
+    query_job = client.query(QUERY)
+    datum_bq = query_job.result()
+
+    # PG와 BQ 비교 --> BQ에는 없고 PG에만 있는 row를 찾아줌
+    ## 근데 그러면 반대 경우는? (비슷하게 짜되 순서만 반대로해서 삭제할 row 찾아주면 됨)
+    cmp_dict = {}
+    candidate_rows = []
+    for data in datum_bq:
+        cmp_dict[data.id] = True #id로만 검증
+
+    for data in datum_pg:
+        if cmp_dict.get(str(data[0])) is None: #tuple object라서 data[0]에 id 있음, 그리고 int형이어서 str로 바꿔줌
+            candidate_rows.append(data)
+
+    # json 형태로 정제
+    rows_to_insert = []
+    if len(candidate_rows) == 0:
+        return redirect('../admin/')
+
+    for data in candidate_rows:
+        form = {}
+        i = 0
+        for value in data:
+            if value is not None:
+                form[schema[i].name] = value
+            i += 1
+        rows_to_insert.append(form)
+
+        # API 리퀘스트 insert_rows로 전부 빅쿼리에 삽입
+    # PG 전체가 아닌 선별된 row들
+    errors = client.insert_rows_json(table_id, rows_to_insert)
+    if errors == []:
+        logger.error("New rows have been added.")
+    else:
+        logger.error("Encountered errors while inserting rows: {}".format(errors))
+
+    return redirect('../admin/')
+
 def to_bq(request):
     # GCP 클라이언트 객체 생성
     client = bigquery.Client(credentials=credentials,
@@ -248,50 +299,163 @@ def to_bq(request):
             i += 1
         rows_to_insert.append(form)
 
+    # case 2가지 정도 생각(뭐가 더 효율적?)
+    #  case #1 table 다 날리고 row 다 insert?
+    #    ddl delete, ddl create, insert all    [두case 모두 필요한 부분] , select * from PG
+    #  case #2 중복되지 않는 row만 insert
+    #    ddl alter, insert 일부, 중복체크?         [두case 모두 필요한 부분] , select * from PG
+    #      -> select * 로 row들 빼오고(기존에 빅쿼리의 row들)
+    # 참고로 과금은 $0.010 per 200 MB --> 일단 1번으로 가고 나중에 데이터가 너무 많아지면 2번으로 가는 걸
+    # 읽기는 $1.1 per TB read (insert all의 1/100 가격)
+
+
     # API 리퀘스트
     errors = client.insert_rows_json(table_id, rows_to_insert)
     if errors == []:
-        print("New rows have been added.")
+        logger.error("New rows have been added.")
     else:
-        print("Encountered errors while inserting rows: {}".format(errors))
+        logger.error("Encountered errors while inserting rows: {}".format(errors))
 
     return redirect('../admin/')
-def val_return(strval, scr):
-    #1234567
-    #3210123
-    scr_num = '3210123'
-    if scr < 4: return strval[0], int(scr_num[scr-1])
-    elif scr > 4: return strval[1], int(scr_num[scr-1])
-    else: return False
 
 
-
-def bq_connection(req, val):
+def delete_table_bq(request):
+    # GCP 클라이언트 객체 생성
     client = bigquery.Client(credentials=credentials,
                              project=credentials.project_id)
-    an = ""
-    #1
-    d, l = {}, 'RTCFJMAN' #rtcfjman'
+    # API 리퀘스트
+    client.delete_table(table_id, not_found_ok=True)
+    logger.error("Deleted table '{}'.".format(table_id))
+
+    return redirect('../admin/')
+
+
+def create_table_bq(request):
+    client = bigquery.Client(credentials=credentials,
+                             project=credentials.project_id)
+
+    # table_id = bigquery.Table.from_string("gcloud-hlhl.data_set.chart_info")
+    # schema = [
+    #     bigquery.SchemaField("id", "STRING"),
+    # ]
+    # 테이블 아이디, 스키마 전역변수로 설정해놓음.. 테스트 이후 파라미터로 바꿀 것
+
+    table = bigquery.Table(table_id, schema=schema)
+    table = client.create_table(table)
+    logger.error(
+            "Created table {}.{}.{}".format(table.project, table.dataset_id, table.table_id)
+    )
+
+    return redirect('../admin/')
+
+
+
+
+
+
+
+
+######################################## 다른 곳에 구현 또는 테스트의 테스트용(연습용) ########################################
+
+
+import pandas as pd
+
+
+def export_value():
+    authors = pd.read_excel("맘스터치권한세팅.xlsx")
+    logger.error(authors)
+
+
+def export_to_bq(request):  # chart_info 과거에 만든 것도(필드 추가나 제거된 것도) ->스키마를 보고 자동생성하기
+    GOOGLE_APPLICATION_CREDENTIALS = "iam.json"
+
+    client = bigquery.Client()
+
+    QUERY0 = (
+        "SELECT * FROM `gcloud-hlhl.data_set.box1` "
+        "WHERE name = '손오공' "
+        "LIMIT 100")
+    QUERY = (
+        "INSERT INTO gcloud-hlhl.data_set.box1 "
+        "VALUES('SAMSUNG2ndGen', 200, 'CFO')")
+
+    query_job = client.query(QUERY)
+    rows = query_job.result()
+    for row in rows:
+        logger.error(row.name)
+
+    return redirect('../admin/')
+
+
+
+##########
+
+from collections import deque
+
+def pop_q(qs, front, pop_i, ans):
+    n, pop_i_ori = len(qs), pop_i
+    while True:
+        if len(qs[pop_i]) > 0:
+            val = qs[pop_i].popleft()
+
+            if len(front) > 0: ans.append(front.pop())
+            front.append(val)
+            pop_i = (pop_i + 1) % n
+            break
+        pop_i = (pop_i + 1) % n
+        if pop_i == pop_i_ori:
+            if len(front) > 0: ans.append(front.pop())
+            break
+    return qs, front, pop_i, ans
+def push_q(qs, front, q_no, val):
+    qs[q_no].append(val)  # push
+    if len(front) == 0:
+        front.append(qs[q_no].popleft())
+    return qs, front
+
+def val_return(n, qrys):
+    #client = bigquery.Client(credentials=credentials,
+                             #project=credentials.project_id)
+    ans, qs, front, pop_i = [], [], [], 0
+
+    for i in range(n):
+        q = deque()
+        qs.append(q)
+    #errors = client.insert_rows_json(table_id, ans)
+    for qry in qrys:
+        q_no, val = qry[0], qry[1]
+
+        if q_no == -1:
+            print("pop :  , pop_i", pop_i)
+            print("qs :", qs)
+            print(" front : ", front, "  ans : ", ans)
+            qs, front, pop_i, ans = pop_q(qs, front, pop_i, ans)
+
+
+        else:
+            print("push :  q_no , val :", q_no,"  ,", val)
+            print("qs :", qs)
+            print(" front : ", front, "  ans : ", ans)
+            qs, front = push_q(qs, front, q_no, val)
+        print("after ---  :    qs :", qs)
+        print(" front : ", front, "  ans : ", ans)
+
+    return ans
+
+def bq_connection():
+    client = bigquery.Client(credentials=credentials,
+                             project=credentials.project_id)
+
     connection = psycopg2.connect(host="127.0.0.1", dbname="chart", user="hl", password="hl", port=5432)
-    for v in l: d[v] = 0
+
     cur = connection.cursor()
-    for i in range(len(req)):
-        val_ret = val_return(req[i], val[i])
-        if val_ret: d[ val_ret[0] ] += val_ret[1]
+
     cur.execute("SELECT * FROM charts_chart;")
-    if d[l[0]] >= d[l[1]]: an += l[0]
-    else: an += l[1]
-    if d[l[2]] >= d[l[3]]: an += l[2]
-    else: an += l[3]
-    if d[l[4]] >= d[l[5]]: an += l[4]
-    else: an += l[5]
-    if d[l[6]] >= d[l[7]]: an += l[6]
-    else: an += l[7]
 
 
     datum = cur.fetchall()
 
-    print(an)
+
 
     return client
 
@@ -316,83 +480,15 @@ def from_bq(request):
                 form[schema[i].name] = value
             i += 1
         rows_to_insert.append(form)
-        #1rt 2cf 3jm 4an = 16ways, nq7ans( n3/2/1/0/1/2/3a )
+
 
     # API 리퀘스트
     errors = client.insert_rows_json(table_id, rows_to_insert)
-    #'tcma' ['an','cf','mj','rt','na'] [5,3,2,7,5]
+
     if errors == []:
-        print("New rows have been added.")
+        logger.error("New rows have been added.")
     else:
-        print("Encountered errors while inserting rows: {}".format(errors))
-    print( bq_connection( ['AN','CF','MJ','RT','NA'] , [5,3,2,7,5]) )
-
-    return redirect('../admin/')
-
-
-def delete_table_bq(request):
-    # GCP 클라이언트 객체 생성
-    client = bigquery.Client(credentials=credentials,
-                             project=credentials.project_id)
-    # API 리퀘스트
-    client.delete_table(table_id, not_found_ok=True)
-    print("Deleted table '{}'.".format(table_id))
-
-    return redirect('../admin/')
-
-
-def create_table_bq(request):
-    client = bigquery.Client(credentials=credentials,
-                             project=credentials.project_id)
-
-    # table_id = bigquery.Table.from_string("gcloud-hlhl.data_set.chart_info")
-    # schema = [
-    #     bigquery.SchemaField("id", "STRING"),
-    # ]
-    # 테이블 아이디, 스키마 전역변수로 설정해놓음.. 테스트 이후 파라미터로 바꿀 것
-
-    table = bigquery.Table(table_id, schema=schema)
-    table = client.create_table(table)
-    print(
-            "Created table {}.{}.{}".format(table.project, table.dataset_id, table.table_id)
-    )
-
-    return redirect('../admin/')
-
-
-
-
-
-
-
-
-######################################## 다른 곳에 구현 또는 테스트의 테스트용 ########################################
-
-
-import pandas as pd
-
-
-def export_value():
-    authors = pd.read_excel("맘스터치권한세팅.xlsx")
-    print(authors)
-
-
-def export_to_bq(request):  # chart_info 과거에 만든 것도(필드 추가나 제거된 것도) ->스키마를 보고 자동생성하기
-    GOOGLE_APPLICATION_CREDENTIALS = "iam.json"
-
-    client = bigquery.Client()
-
-    QUERY0 = (
-        "SELECT * FROM `gcloud-hlhl.data_set.box1` "
-        "WHERE name = '손오공' "
-        "LIMIT 100")
-    QUERY = (
-        "INSERT INTO gcloud-hlhl.data_set.box1 "
-        "VALUES('SAMSUNG2ndGen', 200, 'CFO')")
-
-    query_job = client.query(QUERY)
-    rows = query_job.result()
-    for row in rows:
-        print(row.name)
+        logger.error("Encountered errors while inserting rows: {}".format(errors))
+    logger.error(val_return(4, [[1, 5], [-1, -1]]))
 
     return redirect('../admin/')
